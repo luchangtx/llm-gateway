@@ -1,0 +1,17 @@
+{
+  "name": "llm-gateway",
+  "version": "1.1.0",
+  "description": "统一 LLM 网关：多渠道（baseUrl+key+协议）聚合为一个 OpenAI 兼容入口，单一 key 转发，自动识别模型能力（视觉/思考/上下文长度/最大输出）",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "show-key": "node src/show-key.js",
+    "reset-key": "node src/reset-key.js",
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "license": "MIT"
+}

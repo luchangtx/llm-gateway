@@ -1,0 +1,63 @@
+{
+  "port": 8787,
+  "host": "127.0.0.1",
+  "gateway_key": "",
+  "routing": {
+    "failover": true,
+    "timeout_ms": 120000,
+    "idle_timeout_ms": 60000,
+    "first_byte_timeout_ms": 60000
+  },
+  "capabilities": {
+    "refresh_minutes": 720,
+    "probe_concurrency": 2,
+    "expose_prefixed_ids": true,
+    "overrides": {
+      "示例渠道/gpt-4o": { "vision": true, "context": 128000 }
+    }
+  },
+  "channels": [
+    {
+      "name": "zhipu",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "api_key": "在这里填你的 key",
+      "protocol": "openai",
+      "api_style": "chat",
+      "enabled": true,
+      "priority": 10,
+      "models": [],
+      "model_aliases": {}
+    },
+    {
+      "name": "openai-responses",
+      "base_url": "https://api.openai.com",
+      "api_key": "sk-xxx",
+      "protocol": "openai",
+      "api_style": "responses",
+      "enabled": false,
+      "priority": 10,
+      "models": [],
+      "model_aliases": {}
+    },
+    {
+      "name": "anthropic",
+      "base_url": "https://api.anthropic.com",
+      "api_key": "sk-ant-xxx",
+      "protocol": "anthropic",
+      "enabled": true,
+      "priority": 10,
+      "models": [],
+      "model_aliases": {}
+    },
+    {
+      "name": "gemini",
+      "base_url": "https://generativelanguage.googleapis.com",
+      "api_key": "AIzaxxx",
+      "protocol": "gemini",
+      "enabled": true,
+      "priority": 10,
+      "models": [],
+      "model_aliases": {}
+    }
+  ]
+}

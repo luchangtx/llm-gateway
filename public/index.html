@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f8ef7'/%3E%3Cpath d='M18 4 8 18h6l-2 10L24 13h-7l1-9z' fill='white'/%3E%3C/svg%3E">
+<title>统一 LLM 网关</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    --bg: #0e1117; --panel: #161b24; --panel2: #1c2330; --border: #2a3345;
+    --text: #dce3ee; --muted: #8b96a9; --accent: #4f8ef7; --accent2: #7c5cff;
+    --green: #34c98e; --red: #f0564f; --yellow: #e8b93e; --purple: #a06bf5;
+    --codebg: #0a0d13; --rowhover: rgba(127,160,255,.055);
+    --shadow: 0 1px 2px rgba(0,0,0,.35);
+    --chip-override: #7fb0ff; --chip-probe: #34c98e; --chip-provider: #c49bff; --chip-kb: #e8b93e; --chip-name: #8b96a9;
+  }
+  body.light { --bg: #f4f6fa; --panel: #ffffff; --panel2: #eef2f8; --border: #dbe2ee;
+    --text: #1c2433; --muted: #64748b; --accent: #2563eb; --accent2: #7c3aed;
+    --green: #059669; --red: #dc2626; --yellow: #b45309; --purple: #7c3aed;
+    --codebg: #151d30; --rowhover: rgba(37,99,235,.05);
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.07);
+    --chip-override: #2563eb; --chip-probe: #059669; --chip-provider: #7c3aed; --chip-kb: #b45309; --chip-name: #64748b;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { scrollbar-gutter: stable; }
+  * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.6 -apple-system, "PingFang SC", "Segoe UI", sans-serif; }
+  body, header, .card, table, th, td, input, select, textarea, dialog, pre.snippet, .dbg-out, .twrap {
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+  }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 10; }
+  .logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .logo svg { width: 16px; height: 16px; }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .5px; white-space: nowrap; }
+  header .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); flex: none; }
+  header .spacer { flex: 1; }
+  .keywrap { display: flex; align-items: center; gap: 6px; }
+  input, select, textarea {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 7px 10px; font: inherit; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,.15); }
+  textarea { width: 100%; resize: vertical; font-family: var(--mono); font-size: 12.5px; }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 7px 14px; cursor: pointer; font: inherit; transition: .15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  button:hover { filter: brightness(1.12); }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  button.ghost:hover { color: var(--text); border-color: var(--accent); }
+  button.mini { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
+  button.danger { background: transparent; border: 1px solid var(--border); color: var(--red); }
+  .icon-btn { padding: 6px 8px; }
+  .icon-btn svg { display: block; }
+  #btnTheme .ic-moon, #btnEye .ic-eye-off { display: none; }
+  body.light #btnTheme .ic-sun { display: none; }
+  body.light #btnTheme .ic-moon { display: block; }
+  #btnEye.show-pw .ic-eye { display: none; }
+  #btnEye.show-pw .ic-eye-off { display: block; }
+  main, nav.tabs { max-width: 1284px; margin-left: auto; margin-right: auto; }
+  main { padding: 0 22px 48px; }
+  nav.tabs { display: flex; gap: 6px; margin-top: 12px; padding: 0 22px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  nav.tabs button { display: inline-flex; align-items: center; gap: 7px; background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 14px; font-size: 14px; white-space: nowrap; }
+  nav.tabs button svg { flex: none; opacity: .8; }
+  nav.tabs button:hover { color: var(--text); filter: none; }
+  nav.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+  nav.tabs button.active svg { opacity: 1; }
+  section.tab { display: none; padding-top: 18px; }
+  section.tab.active { display: block; animation: tabIn .18s ease; }
+  @keyframes tabIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  .switch { position: relative; display: inline-block; width: 34px; height: 19px; vertical-align: middle; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 20px; transition: .2s; }
+  .switch .slider::before { content: ""; position: absolute; height: 13px; width: 13px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .switch input:checked + .slider { background: var(--green); }
+  .switch input:checked + .slider::before { transform: translateX(15px); }
+  td.empty-cell { text-align: center; color: var(--muted); padding: 30px 12px; }
+  .badge svg, #pgCaps svg { vertical-align: -2px; }
+  .twrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12.5px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--panel2); white-space: nowrap; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--rowhover); }
+  td.model-id { font-family: var(--mono); font-size: 12.5px; }
+  td.clickable { cursor: pointer; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 20px; font-size: 11.5px; margin-right: 4px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+  .badge.yes { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+  .badge.no { color: var(--muted); opacity: .55; }
+  .badge.unk { color: var(--yellow); border-style: dashed; opacity: .9; }
+  .badge.p-openai { color: var(--green); } .badge.p-anthropic { color: var(--yellow); } .badge.p-gemini { color: var(--accent); }
+  .src { font-size: 11px; padding: 1px 7px; border-radius: 5px; margin-right: 4px; }
+  .src.override { background: rgba(79,142,247,.16); color: var(--chip-override); }
+  .src.probe { background: rgba(52,201,142,.14); color: var(--chip-probe); }
+  .src.provider { background: rgba(160,107,245,.15); color: var(--chip-provider); }
+  .src.kb { background: rgba(232,185,62,.13); color: var(--chip-kb); }
+  .src.name, .src.default { background: var(--panel2); color: var(--chip-name); }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar input[type=search] { min-width: 240px; }
+  .muted { color: var(--muted); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .grid2 > *, .grid3 > * { min-width: 0; }
+  label.f > input, label.f > select { width: 100%; }
+  label.f { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); }
+  label.f > span b { color: var(--text); font-weight: 500; }
+  pre.snippet { background: var(--codebg); color: #dce3ee; border: 1px solid var(--border); border-radius: 10px; padding: 14px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; position: relative; }
+  pre.snippet .copy { position: absolute; top: 8px; right: 8px; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--border); padding: 9px 18px; border-radius: 10px; display: none; z-index: 99; box-shadow: 0 8px 30px rgba(0,0,0,.35); max-width: 80vw; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 14px; padding: 22px; min-width: 460px; max-width: min(640px, 92vw); box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  dialog h3 { margin: 0 0 14px; font-size: 15px; }
+  .dbg-out { background: var(--codebg); color: #dce3ee; border: 1px solid var(--border); border-radius: 10px; padding: 14px; min-height: 120px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+  .dbg-out .reason { color: var(--purple); }
+  .chip { display: inline-block; background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 0 7px; font-size: 11.5px; color: var(--muted); }
+  code { font-family: var(--mono); background: var(--panel2); border-radius: 5px; padding: 1px 6px; font-size: 12.5px; }
+  a { color: var(--accent); }
+  .stats { display: flex; gap: 18px; color: var(--muted); font-size: 12.5px; margin-bottom: 12px; flex-wrap: wrap; }
+  .stats b { color: var(--text); }
+  h3 { font-size: 14.5px; }
+  @media (max-width: 760px) {
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+    header { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo"><svg viewBox="0 0 32 32"><path d="M18 4 8 18h6l-2 10L24 13h-7l1-9z" fill="#fff"/></svg></span>
+  <h1>统一 LLM 网关</h1>
+  <span class="chip" id="verChip">v—</span>
+  <span class="dot" id="healthDot" title="服务状态"></span>
+  <span class="muted" id="healthInfo"></span>
+  <div class="spacer"></div>
+  <button class="ghost mini icon-btn" id="btnTheme" title="切换主题">
+    <svg class="ic-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    <svg class="ic-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+  <div class="keywrap">
+    <input type="password" id="gwKey" placeholder="网关 key（登录后台用）" style="width:230px" title="这只是本浏览器登录后台的凭证（保存在本地），不会修改服务端的网关 key。要修改 key 请到「设置」页">
+    <button class="ghost mini" onclick="loginKey()" title="用输入的 key 登录本页">登录</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="channels" class="active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>渠道</button>
+  <button data-tab="models"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>模型与能力</button>
+  <button data-tab="playground"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>调试</button>
+  <button data-tab="logs"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>日志</button>
+  <button data-tab="usage2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>看板</button>
+  <button data-tab="settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>设置</button>
+  <button data-tab="usage"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>接入用法</button>
+</nav>
+
+<main>
+  <!-- 渠道 -->
+  <section class="tab active" id="tab-channels">
+    <div class="toolbar">
+      <button onclick="openChannelDialog()">＋ 添加渠道</button>
+      <button class="ghost" id="btnRefreshModels" onclick="refreshRegistry()">刷新模型列表</button>
+      <span class="muted">协议说明：openai 分 Chat Completions / Responses API 两种方言；anthropic、gemini 由网关自动转换</span>
+    </div>
+    <div class="twrap">
+      <table id="channelTable">
+        <thead><tr><th>名称</th><th>Base URL</th><th>协议</th><th>Key</th><th>优先级</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:12.5px">提示：优先级数字越小越靠前；同一模型出现在多个渠道时按优先级排序并自动故障转移。不提供模型列表接口的渠道，可在编辑里手写模型名。</p>
+  </section>
+
+  <!-- 模型 -->
+  <section class="tab" id="tab-models">
+    <div class="toolbar">
+      <input type="search" id="modelFilter" placeholder="筛选模型 / 渠道…" oninput="renderModels()">
+      <button class="ghost" onclick="loadModels(true)">刷新</button>
+      <button onclick="probeAllConfirm()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.5L4.3 18.6A2 2 0 0 0 6 21.5h12a2 2 0 0 0 1.7-2.9L14 9.5V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg>探测能力（当前筛选）</button>
+      <span class="muted">能力来源：<span class="src override">手动覆盖</span><span class="src probe">实测</span><span class="src provider">渠道元数据</span><span class="src kb">知识库</span><span class="src name">名称推断</span></span>
+    </div>
+    <div class="stats" id="modelStats"></div>
+    <div class="twrap">
+      <table id="modelTable">
+        <thead><tr><th>模型 ID（点击复制）</th><th>渠道</th><th>协议</th><th>视觉</th><th>思考</th><th>上下文</th><th>最大输出</th><th>来源</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 调试 -->
+  <section class="tab" id="tab-playground">
+    <div class="grid2" style="grid-template-columns: 420px minmax(0, 1fr); gap:16px;">
+      <div class="card">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <label class="f"><span><b>模型</b></span><select id="pgModel" style="width:100%"></select></label>
+          <div class="muted" id="pgCaps" style="font-size:12px;min-height:18px"></div>
+          <label class="f"><span><b>System 提示词（可选）</b></span><textarea id="pgSystem" rows="3" placeholder="你是一个测试助手"></textarea></label>
+          <label class="f"><span><b>用户消息</b></span><textarea id="pgUser" rows="5">你好，用一句话介绍你自己</textarea></label>
+          <label class="f"><span><b>图片 URL（可选，测视觉）</b></span><input id="pgImage" placeholder="https://... 或 data:image/png;base64,..."></label>
+          <div class="grid3">
+            <label class="f"><span><b>max_tokens</b></span><input id="pgMax" type="number" value="1024"></label>
+            <label class="f"><span><b>temperature</b></span><input id="pgTemp" type="number" step="0.1" value="0.7"></label>
+            <label class="f"><span><b>reasoning_effort</b></span>
+              <select id="pgEffort"><option value="">不指定</option><option>minimal</option><option>low</option><option>medium</option><option>high</option></select>
+            </label>
+          </div>
+          <label style="display:flex;gap:6px;align-items:center;color:var(--muted)"><input type="checkbox" id="pgStream" checked> 流式输出</label>
+          <button id="btnSend" onclick="sendClick()">发送请求</button>
+        </div>
+      </div>
+      <div>
+        <div class="muted" id="pgMeta" style="margin-bottom:8px;font-size:12.5px"></div>
+        <div class="dbg-out" id="pgOut">响应会显示在这里</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 日志 -->
+  <section class="tab" id="tab-logs">
+    <div class="toolbar">
+      <button class="ghost" onclick="loadLogs()">刷新</button>
+      <span class="muted">最近 500 条加载在内存；全部请求已持久化到 data/requests.jsonl，重启不丢</span>
+    </div>
+    <div class="twrap">
+      <table id="logTable">
+        <thead><tr><th>时间</th><th>模型</th><th>渠道</th><th>状态</th><th>耗时</th><th>tokens（入·缓存/出·思考）</th><th>备注</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 设置 -->
+  <section class="tab" id="tab-settings">
+    <div class="card" id="settingsLocked" style="display:none;border-color:var(--yellow)">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:3px;color:var(--yellow)"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div>
+          <b>尚未登录</b>
+          <p class="muted" style="margin:4px 0 0;font-size:12.5px">当前浏览器没有有效的网关 key。如果是首次使用，<b>刷新页面</b>会弹出首次设置向导；否则在服务器上运行 <code>npm run show-key</code> 查看当前 key，或 <code>npm run reset-key</code> 重置（自动热加载，无需重启）。</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 6px">主 Key（网关主凭证）</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px">可以自动生成，也可以填自己的；保存后立即生效，已接入的客户端需要同步更换。需要给别人分发独立凭证（可单独失效）请用下方「附加 Keys」。<b>注意区分：右上角的输入框只是本浏览器的「登录」，这里修改的才是服务端的 key。</b></p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="setKey" type="password" style="flex:1;min-width:250px;font-family:var(--mono)" placeholder="sk-gw-...（至少 8 个字符）">
+        <button class="ghost icon-btn" id="btnEye" onclick="toggleKeyEye()" title="显示 / 隐藏">
+          <svg class="ic-eye" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="ic-eye-off" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+        <button class="ghost" onclick="genKeyLocal()" title="在本地生成一个随机 key 填入输入框">随机生成</button>
+        <button class="ghost" onclick="rotateKey()" title="由服务端立即生成并启用新 key">一键轮换</button>
+        <button onclick="saveGatewayKey()">保存 Key</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin:10px 0 0">注意：保存或轮换新 key 后，请同步更新所有客户端与页面右上角的 key（保存时会自动帮你更新本页登录）。</p>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="margin:0">附加 Keys（多人接入）</h3>
+        <button onclick="addKey()">＋ 添加 Key</button>
+      </div>
+      <p class="muted" style="margin:0 0 10px;font-size:12.5px">给不同的人/应用分发独立 key，随时停用或删除；日志与看板会记录每个 key 的用量归属。停用/删除立即生效。</p>
+      <div class="twrap">
+        <table id="keysTable">
+          <thead><tr><th style="width:180px">名称（可编辑）</th><th>Key</th><th style="width:130px">状态</th><th style="width:80px">操作</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 12px">转发设置</h3>
+      <div class="grid2">
+        <label class="f"><span><b>端口</b>（默认 8787，修改后需重启）</span><input id="setPort" type="number" placeholder="默认 8787"></label>
+        <label class="f"><span><b>模型列表自动刷新间隔（分钟）</b>（默认 720，0 = 不自动）</span><input id="setRefresh" type="number" placeholder="默认 720"></label>
+        <label class="f"><span><b>非流式请求总超时（ms）</b>（默认 120000）</span><input id="setTimeout" type="number" placeholder="默认 120000"></label>
+        <label class="f"><span><b>流式空闲超时（ms）</b>（默认 60000）</span><input id="setIdle" type="number" placeholder="默认 60000"></label>
+        <label class="f"><span><b>流式首包超时（ms）</b>（默认 60000，上游迟迟不返回就中断）</span><input id="setFirstByte" type="number" placeholder="默认 60000"></label>
+      </div>
+      <label style="display:flex;gap:6px;align-items:center;margin:12px 0;color:var(--text)"><input type="checkbox" id="setFailover"> 同名模型多渠道自动故障转移（默认开启）</label>
+      <button onclick="saveRouting()">保存设置</button>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 10px">关于</h3>
+      <div class="stats">
+        <span>版本 <b id="aboutVer">—</b></span>
+        <span>配置文件 <b id="setCfgPath" style="font-family:var(--mono);font-size:12px">—</b></span>
+      </div>
+      <p class="muted" style="font-size:12.5px;margin:0">统一 LLM 网关 · 零依赖 Node 服务 · 所有数据与 key 均保存在本地</p>
+    </div>
+  </section>
+
+  <!-- 看板 -->
+  <section class="tab" id="tab-usage2">
+    <div class="toolbar">
+      <select id="udRange" onchange="loadUsage()">
+        <option value="7">近 7 天</option>
+        <option value="30">近 30 天</option>
+        <option value="today">今天</option>
+        <option value="all">全部</option>
+      </select>
+      <select id="udChannel" onchange="loadUsage()"><option value="">全部渠道</option></select>
+      <select id="udModel" onchange="loadUsage()"><option value="">全部模型</option></select>
+      <button class="ghost" onclick="loadUsage()">刷新</button>
+      <span class="muted">数据持久化在 data/usage.json，重启不丢</span>
+    </div>
+    <div class="stats" id="udCards" style="font-size:13px"></div>
+    <div class="card" id="udDaysCard" style="display:none">
+      <h3 style="margin:0 0 12px">每日消耗</h3>
+      <div id="udBars" style="display:flex;align-items:flex-end;justify-content:center;gap:8px;height:150px"></div>
+      <div id="udDaysLabels" style="display:flex;justify-content:center;gap:8px;margin-top:6px"></div>
+    </div>
+    <div class="twrap">
+      <table id="udChannelTable">
+        <thead><tr><th>渠道</th><th>请求</th><th>成功/失败</th><th>输入 tokens（含缓存）</th><th>输出 tokens（含思考）</th><th>缓存命中</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div style="height:14px"></div>
+    <div class="twrap">
+      <table id="udModelTable">
+        <thead><tr><th>模型</th><th>请求</th><th>成功/失败</th><th>输入 tokens（含缓存）</th><th>输出 tokens（含思考）</th><th>缓存命中</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 用法 -->
+  <section class="tab" id="tab-usage">
+    <div class="card">
+      <p>任何支持 OpenAI 协议的客户端，把 <b>base_url</b> 改成 <code id="uBase" style="font-family:var(--mono)"></code>，<b>API Key</b> 填网关 key 即可。模型名支持 <code>渠道名/模型名</code> 精确指定，或直接写模型名（多渠道同名时按优先级自动选择+故障转移）。</p>
+      <p><b>关于协议方言</b>：网关支持 <b>Chat Completions</b>（<code>/v1/chat/completions</code>）和 <b>Responses</b>（<code>/v1/responses</code>）两种接入方言，<b>所有模型两种都能调</b>——Responses 渠道原生透传，其余渠道网关自动双向转换。Codex CLI 等 Responses 方言客户端把 base_url 指到网关即可。</p>
+      <div class="grid2">
+        <div>
+          <p><b>curl</b></p>
+          <pre class="snippet" id="snipCurl"></pre>
+          <p><b>Python (openai SDK)</b></p>
+          <pre class="snippet" id="snipPy"></pre>
+        </div>
+        <div>
+          <p><b>Node.js (openai SDK)</b></p>
+          <pre class="snippet" id="snipJs"></pre>
+          <p><b>Cherry Studio / Cline 等客户端</b></p>
+          <pre class="snippet" id="snipClient"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlgChannel">
+  <h3 id="dlgTitle">编辑渠道</h3>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="grid2">
+      <label class="f"><span><b>名称</b>（用于 渠道名/模型名）</span><input id="fName" placeholder="zhipu"></label>
+      <label class="f"><span><b>协议</b></span>
+        <select id="fProto">
+          <option value="openai">openai（Chat Completions 兼容）</option>
+          <option value="openai-responses">openai（Responses API）</option>
+          <option value="anthropic">anthropic</option>
+          <option value="gemini">gemini</option>
+        </select>
+      </label>
+    </div>
+    <label class="f"><span><b>Base URL</b></span><input id="fBase" placeholder="https://open.bigmodel.cn/api/paas/v4"></label>
+    <label class="f"><span><b>API Key</b>（留空表示不修改）</span><input id="fKey" type="password" placeholder=""></label>
+    <div class="grid2">
+      <label class="f"><span><b>优先级</b>（越小越优先）</span><input id="fPriority" type="number" value="10"></label>
+      <label class="f"><span><b>启用</b></span><label style="display:flex;gap:6px;align-items:center;color:var(--text)"><input type="checkbox" id="fEnabled" checked> 启用该渠道</label></label>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span class="muted" style="font-size:12.5px"><b style="color:var(--text)">模型列表</b>（不拉取则自动发现全部；可拉取后勾选启用哪些）</span>
+      <button class="mini ghost" id="btnFetchModels" onclick="fetchChannelModelsUI()">拉取模型列表</button>
+    </div>
+    <textarea id="fModels" rows="3" placeholder="glm-4.6&#10;glm-4.5-air&#10;（每行一个；点上方按钮可拉取并勾选）"></textarea>
+    <div id="fModelPick" style="display:none;border:1px solid var(--border);border-radius:8px;padding:8px 10px;max-height:180px;overflow:auto;background:var(--panel2)">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <button class="mini ghost" onclick="pickAll(true)">全选</button>
+        <button class="mini ghost" onclick="pickAll(false)">全不选</button>
+        <span class="muted" id="pickCount" style="font-size:12px"></span>
+        <span class="muted" style="font-size:11.5px;margin-left:auto">保存后按勾选生效</span>
+      </div>
+      <div id="pickList" style="display:flex;flex-direction:column;gap:2px"></div>
+    </div>
+    <label class="f"><span><b>模型别名</b>（可选，每行一个 别名=上游真实名）</span><textarea id="fAliases" rows="2" placeholder="gpt-4o=glm-4.6"></textarea></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="ghost" onclick="dlgChannel.close()">取消</button>
+      <button id="btnSaveChannel" onclick="saveChannel()">保存并应用</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgOverride">
+  <h3 id="ovTitle">能力覆盖</h3>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="grid2">
+      <label class="f"><span><b>视觉</b></span><select id="ovVision"><option value="">保持自动</option><option value="true">支持</option><option value="false">不支持</option></select></label>
+      <label class="f"><span><b>思考</b></span><select id="ovReasoning"><option value="">保持自动</option><option value="true">支持</option><option value="false">不支持</option></select></label>
+    </div>
+    <div class="grid2">
+      <label class="f"><span><b>上下文长度</b></span><input id="ovCtx" type="number" placeholder="留空自动"></label>
+      <label class="f"><span><b>最大输出</b></span><input id="ovOut" type="number" placeholder="留空自动"></label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="ghost danger" onclick="clearOverride()">删除覆盖</button>
+      <button class="ghost" onclick="dlgOverride.close()">取消</button>
+      <button onclick="saveOverride()">保存覆盖</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgSetup">
+  <h3>首次设置</h3>
+  <p class="muted" style="margin:0 0 14px;font-size:13px">检测到这是第一次使用（还没有登录过管理后台）。设置一个网关 key，客户端将用它访问网关。此向导仅在本机首次配置时出现。</p>
+  <label class="f"><span><b>自定义网关 key</b>（留空 = 使用服务端已自动生成的 key）</span><input id="suKey" placeholder="sk-gw-...（至少 8 个字符，留空用自动生成的）"></label>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+    <button class="ghost" onclick="doSetup(false)">使用自动生成的 key</button>
+    <button onclick="doSetup(true)">保存并进入</button>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KEEP = '__KEEP__';
+let channels = [];
+let models = [];
+
+// ---------- 基础 ----------
+function toast(msg, ok = true) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.style.borderColor = ok ? 'var(--green)' : 'var(--red)';
+  t.style.display = 'block';
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.style.display = 'none', 2600);
+}
+function copyText(text, tip) {
+  navigator.clipboard.writeText(text).then(() => toast(tip || '已复制'), () => toast('复制失败', false));
+}
+function getKey() { return $('#gwKey').value.trim() || localStorage.getItem('gwkey') || ''; }
+// 右上角 = 本浏览器登录（只写本地，不改服务端配置）
+async function loginKey() {
+  const k = $('#gwKey').value.trim();
+  if (!k) return toast('请输入网关 key', false);
+  if (!(await tryAuth(k))) return toast('✕ key 无效：可运行 npm run show-key 查看当前 key', false);
+  localStorage.setItem('gwkey', k);
+  $('#gwKey').value = k;
+  toast('✓ 已登录');
+  loadAll();
+}
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'authorization': `Bearer ${getKey()}`, 'content-type': 'application/json', ...(opts.headers || {}) }
+  });
+  if (res.status === 401) throw new Error('网关 key 无效：可运行 npm run show-key 查看当前 key，或 npm run reset-key 重置后重新登录');
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j?.error?.message || `HTTP ${res.status}`);
+  return j;
+}
+function fmtTokens(n) {
+  if (!n || n <= 0) return '—';
+  if (n >= 1e6) return (n % 1e6 === 0 ? n / 1e6 : (n / 1e6).toFixed(1)) + 'M';
+  if (n >= 1e3) return Math.round(n / 1e3) + 'K';
+  return String(n);
+}
+const SRC_CN = { override: '手动覆盖', probe: '实测', provider: '渠道元数据', kb: '知识库', name: '名称推断', default: '默认' };
+// 内联 SVG 图标（与 UI 图标风格一致，勿用 emoji）
+const svg = (paths, size = 12) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const I = {
+  eye: svg('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'),
+  zap: svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>')
+};
+
+// ---------- 主题 ----------
+function applyTheme(t) {
+  document.body.classList.toggle('light', t === 'light'); // 图标由 CSS 按主题切换
+}
+$('#btnTheme').onclick = () => {
+  const t = document.body.classList.contains('light') ? 'dark' : 'light';
+  localStorage.setItem('gwtheme', t);
+  applyTheme(t);
+};
+applyTheme(localStorage.getItem('gwtheme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
+
+// ---------- 标签页（切换后回到顶部，避免页面跳动） ----------
+function activateTab(id) {
+  document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x.dataset.tab === id));
+  document.querySelectorAll('section.tab').forEach((x) => x.classList.remove('active'));
+  $('#tab-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+  if (id === 'usage') renderUsage();
+  if (id === 'usage2') { loadUsageFilters(); loadUsage(); }
+  if (id === 'models') loadModels();
+  if (id === 'logs') loadLogs();
+  if (id === 'playground') fillPlaygroundModels();
+  if (id === 'settings') loadSettings();
+}
+document.querySelectorAll('nav.tabs button').forEach((b) => { b.onclick = () => activateTab(b.dataset.tab); });
+
+// ---------- 健康检查 ----------
+async function health() {
+  try {
+    const j = await (await fetch('/healthz')).json();
+    $('#healthDot').style.background = 'var(--green)';
+    $('#healthInfo').textContent = `${j.channels} 个渠道 · ${j.unique_models} 个模型`;
+    $('#verChip').textContent = 'v' + j.version;
+    $('#aboutVer').textContent = 'v' + j.version;
+  } catch {
+    $('#healthDot').style.background = 'var(--red)';
+  }
+}
+setInterval(health, 15000);
+
+// ---------- 渠道 ----------
+function protoLabel(c) { return c.protocol === 'openai' && c.api_style === 'responses' ? 'openai·responses' : c.protocol; }
+function protoClass(c) { return c.protocol === 'openai' && c.api_style === 'responses' ? 'p-gemini' : `p-${c.protocol}`; }
+async function loadChannels() {
+  const j = await api('/admin/channels');
+  channels = j.channels;
+  renderChannels();
+}
+function renderChannels() {
+  const counts = {};
+  for (const m of models) counts[m.channel] = (counts[m.channel] || 0) + 1;
+  const tb = $('#channelTable tbody');
+  tb.innerHTML = channels.map((c, i) => `
+    <tr>
+      <td><b>${esc(c.name)}</b>${c.models.length ? ' <span class="chip">手动列表</span>' : ''}${counts[c.name] ? ` <span class="chip">${counts[c.name]} 模型</span>` : ''}</td>
+      <td style="font-family:var(--mono);font-size:12px">${esc(c.base_url)}</td>
+      <td><span class="badge ${protoClass(c)}">${esc(protoLabel(c))}</span></td>
+      <td class="muted" style="font-family:var(--mono);font-size:12px">${esc(c.api_key_masked) || '<span style="color:var(--red)">未设置</span>'}</td>
+      <td>${c.priority}</td>
+      <td style="white-space:nowrap">
+        <label class="switch" title="点击启用 / 停用该渠道">
+          <input type="checkbox" ${c.enabled ? 'checked' : ''} onchange="toggleChannel(${i}, this.checked)">
+          <span class="slider"></span>
+        </label>
+        <span class="muted" style="font-size:12px;margin-left:6px">${c.enabled ? '启用' : '停用'}</span>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="mini ghost" onclick="testChannel(${i})">测试</button>
+        <button class="mini ghost" onclick="editChannel(${i})">编辑</button>
+        <button class="mini danger" onclick="deleteChannel(${i})">删除</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="7" class="empty-cell">还没有渠道，点上方「添加渠道」</td></tr>';
+}
+let editingIdx = -1;
+let pickState = null; // 弹窗内拉取的模型列表 { models: [...], picked: Set }
+function resetPick() { pickState = null; $('#fModelPick').style.display = 'none'; }
+async function fetchChannelModelsUI() {
+  const spec = {
+    name: $('#fName').value.trim(),
+    base_url: $('#fBase').value.trim().replace(/\/+$/, ''),
+    protocol: $('#fProto').value === 'openai-responses' ? 'openai' : $('#fProto').value,
+    api_key: $('#fKey').value.trim() || KEEP
+  };
+  if (!spec.base_url) return toast('请先填写 Base URL', false);
+  const btn = $('#btnFetchModels');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '拉取中…';
+  try {
+    const j = await api('/admin/channels/probe-models', { method: 'POST', body: JSON.stringify(spec) });
+    if (!j.ok) { toast('拉取失败: ' + j.error, false); return; }
+    pickState = { models: j.models, picked: new Set(j.models) };
+    renderPick();
+    toast(`拉取到 ${j.models.length} 个模型（${j.latency_ms}ms），勾选后保存即生效`);
+  } catch (e) { toast(e.message, false); }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+function renderPick() {
+  const wrap = $('#fModelPick'); const list = $('#pickList');
+  if (!pickState) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = pickState.models.map((m, i) => `
+    <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--text);cursor:pointer">
+      <input type="checkbox" ${pickState.picked.has(m) ? 'checked' : ''} onchange="togglePickIdx(${i}, this.checked)">
+      <span style="font-family:var(--mono);font-size:12px">${esc(m)}</span>
+    </label>`).join('');
+  $('#pickCount').textContent = `已选 ${pickState.picked.size} / ${pickState.models.length}`;
+}
+function togglePickIdx(i, on) {
+  const m = pickState.models[i];
+  on ? pickState.picked.add(m) : pickState.picked.delete(m);
+  $('#pickCount').textContent = `已选 ${pickState.picked.size} / ${pickState.models.length}`;
+}
+function pickAll(on) {
+  if (!pickState) return;
+  pickState.picked = new Set(on ? pickState.models : []);
+  renderPick();
+}
+function openChannelDialog() {
+  editingIdx = -1;
+  resetPick();
+  $('#dlgTitle').textContent = '添加渠道';
+  $('#fName').value = ''; $('#fBase').value = ''; $('#fKey').value = '';
+  $('#fKey').placeholder = '粘贴该渠道的 API Key';
+  $('#fProto').value = 'openai'; $('#fPriority').value = 10; $('#fEnabled').checked = true;
+  $('#fModels').value = ''; $('#fAliases').value = '';
+  $('#dlgChannel').showModal();
+}
+function editChannel(i) {
+  editingIdx = i;
+  resetPick();
+  const c = channels[i];
+  $('#dlgTitle').textContent = `编辑渠道：${c.name}`;
+  $('#fName').value = c.name; $('#fBase').value = c.base_url;
+  $('#fProto').value = c.protocol === 'openai' && c.api_style === 'responses' ? 'openai-responses' : c.protocol;
+  $('#fKey').value = ''; $('#fKey').placeholder = `已设置：${c.api_key_masked}（留空不改）`;
+  $('#fPriority').value = c.priority; $('#fEnabled').checked = c.enabled;
+  $('#fModels').value = c.models.join('\n');
+  $('#fAliases').value = Object.entries(c.model_aliases || {}).map(([k, v]) => `${k}=${v}`).join('\n');
+  $('#dlgChannel').showModal();
+}
+async function saveChannel() {
+  const pv = $('#fProto').value;
+  const c = {
+    name: $('#fName').value.trim(),
+    base_url: $('#fBase').value.trim().replace(/\/+$/, ''),
+    protocol: pv === 'openai-responses' ? 'openai' : pv,
+    api_style: pv === 'openai-responses' ? 'responses' : 'chat',
+    api_key: $('#fKey').value.trim() || KEEP,
+    priority: +$('#fPriority').value || 10,
+    enabled: $('#fEnabled').checked,
+    models: $('#fModels').value.split('\n').map((s) => s.trim()).filter(Boolean),
+    model_aliases: Object.fromEntries($('#fAliases').value.split('\n').map((s) => s.trim()).filter(Boolean).map((l) => l.split('=').map((x) => x.trim())).filter((p) => p.length === 2 && p[0] && p[1]))
+  };
+  if (!c.name || !c.base_url) return toast('名称和 Base URL 必填', false);
+  if (pickState) {
+    // 拉取过列表 → 以勾选为准（全部取消勾选 = 恢复自动发现）
+    c.models = [...pickState.picked];
+  }
+  const btn = $('#btnSaveChannel');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '保存中…';
+  try {
+    if (editingIdx >= 0) channels[editingIdx] = { ...channels[editingIdx], ...c };
+    else channels.push(c);
+    await putChannels();
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+async function deleteChannel(i) {
+  if (!confirm(`确定删除渠道 ${channels[i].name}？`)) return;
+  channels.splice(i, 1);
+  await putChannels();
+}
+// 保存后模型列表后台刷新，自动同步两次
+function syncModelsSoon() {
+  loadModels(); health();
+  setTimeout(loadModels, 2500);
+  setTimeout(() => { loadModels(); health(); }, 6000);
+}
+async function toggleChannel(i, on) {
+  const c = channels[i];
+  if (c.enabled === on) return;
+  c.enabled = on;
+  renderChannels(); // 立即反馈开关状态
+  try {
+    const j = await api('/admin/channels', { method: 'PUT', body: JSON.stringify({ channels }) });
+    channels = j.channels;
+    renderChannels();
+    toast(`✓ 已${on ? '启用' : '停用'} ${c.name}，模型列表后台刷新中…`);
+    syncModelsSoon();
+  } catch (e) {
+    c.enabled = !on; // 失败回滚
+    renderChannels();
+    toast(e.message, false);
+  }
+}
+async function putChannels() {
+  try {
+    const j = await api('/admin/channels', { method: 'PUT', body: JSON.stringify({ channels }) });
+    channels = j.channels;
+    renderChannels();
+    $('#dlgChannel').close();
+    toast('✓ 已保存，模型列表后台刷新中…');
+    syncModelsSoon();
+  } catch (e) { toast(e.message, false); }
+}
+async function testChannel(i) {
+  toast(`正在测试 ${channels[i].name} ...`);
+  try {
+    const j = await api(`/admin/channels/${encodeURIComponent(channels[i].name)}/test`, { method: 'POST' });
+    if (j.ok) toast(`✓ ${channels[i].name} 连通，${j.model_count} 个模型，${j.latency_ms}ms`);
+    else toast(`✕ ${channels[i].name}: ${j.error}`, false);
+  } catch (e) { toast(e.message, false); }
+}
+async function refreshRegistry() {
+  const btn = $('#btnRefreshModels');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '刷新中…';
+  try {
+    const j = await api('/admin/refresh', { method: 'POST' });
+    toast(`已刷新 ${j.models} 个模型`);
+    loadModels(); health();
+  } catch (e) { toast(e.message, false); }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+
+// ---------- 模型 ----------
+async function loadModels(notify) {
+  try {
+    const j = await api('/admin/models');
+    models = j.models;
+    renderModels(); renderChannels();
+    if (notify) toast(`共 ${models.length} 个模型条目`);
+  } catch (e) { toast(e.message, false); }
+}
+function renderModels() {
+  const q = ($('#modelFilter').value || '').toLowerCase();
+  const list = models.filter((m) => !q || m.id.toLowerCase().includes(q));
+  const unknownVis = models.filter((m) => m.caps.vision === undefined || m.caps.vision === null).length;
+  $('#modelStats').innerHTML = `<span>模型条目 <b>${models.length}</b></span><span>去重后 <b>${new Set(models.map((m) => m.model)).size}</b></span><span>支持视觉 <b>${models.filter((m) => m.caps.vision).length}</b></span><span>支持思考 <b>${models.filter((m) => m.caps.reasoning).length}</b></span>${unknownVis ? `<span>视觉未识别 <b>${unknownVis}</b>（可探测/覆盖）</span>` : ''}`;
+  const tb = $('#modelTable tbody');
+  tb.innerHTML = list.map((m) => {
+    // 三态：true=支持 / false=确认不支持 / 其他=未知（不冒充"不支持"）
+    const cap = (v, icon, label, srcLabel) => {
+      if (v === true) return `<span class="badge yes" title="来源: ${esc(srcLabel)}">${I[icon]} ${label}</span>`;
+      if (v === false) return `<span class="badge no" title="来源: ${esc(srcLabel)}">${I[icon]} ${label}?</span>`;
+      return `<span class="badge unk" title="未识别：点右侧「探测」实测，或「覆盖」手动指定">${I[icon]} ${label}?</span>`;
+    };
+    const srcLabel = (f) => (m.sources && m.sources[f] && SRC_CN[m.sources[f]]) || '未知';
+    const srcs = Object.entries(m.sources || {}).map(([f, s]) => `<span class="src ${esc(s)}" title="${esc(f)}">${esc(SRC_CN[s] || s)}</span>`).join('');
+    return `<tr>
+      <td class="model-id clickable" title="点击复制" onclick="copyText('${esc(m.id)}')">${esc(m.id)}</td>
+      <td>${esc(m.channel)}</td>
+      <td><span class="badge ${m.protocol === 'openai' && m.api_style === 'responses' ? 'p-gemini' : 'p-' + esc(m.protocol)}">${esc(m.protocol === 'openai' && m.api_style === 'responses' ? 'openai·responses' : m.protocol)}</span></td>
+      <td>${cap(m.caps.vision, 'eye', '视觉', srcLabel('vision'))}</td>
+      <td>${cap(m.caps.reasoning, 'zap', '思考', m.caps.levels ? `档位: ${m.caps.levels.join('/')}` : `参数: ${m.caps.thinking_param || '—'}`)}</td>
+      <td>${fmtTokens(m.caps.context)}</td>
+      <td>${fmtTokens(m.caps.max_output)}</td>
+      <td style="max-width:220px">${srcs || '<span class="muted" style="font-size:11.5px">全部未知，建议探测</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="mini ghost" onclick="probeOne('${esc(m.channel)}','${esc(m.model)}')">探测</button>
+        <button class="mini ghost" onclick="editOverride('${esc(m.id)}')">覆盖</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" class="empty-cell">没有模型，请先添加渠道并刷新</td></tr>';
+}
+async function probeOne(channel, model) {
+  toast(`正在探测 ${model}（消耗极少 token）...`);
+  try {
+    const j = await api('/admin/probe', { method: 'POST', body: JSON.stringify({ channel, model, skip_cached_days: 0 }) });
+    const r = j.results[0] || {};
+    const v = r.vision === null ? '未知' : r.vision ? '✓ 支持' : '✕ 不支持';
+    const t = r.reasoning === null ? '未知' : r.reasoning ? '✓ 支持' : '✕ 不支持';
+    toast(`${model} → 视觉: ${v} | 思考: ${t}`);
+    loadModels();
+  } catch (e) { toast(e.message, false); }
+}
+function probeAllConfirm() {
+  // 探测当前筛选出来的模型（无筛选 = 全部）
+  const q = ($('#modelFilter').value || '').toLowerCase();
+  const list = models.filter((m) => !q || m.id.toLowerCase().includes(q));
+  if (!list.length) return toast('没有匹配的模型', false);
+  const ids = list.map((m) => m.id);
+  if (!confirm(`将向 ${ids.length} 个模型发送最小探测请求（每个 2 次小请求，消耗少量 token），继续？`)) return;
+  const btn = document.querySelector('#tab-models .toolbar button:not(.ghost):not([id])') || document.querySelector('#tab-models .toolbar button:nth-of-type(2)');
+  toast(`探测中（${ids.length} 个模型，结果写入缓存）...`);
+  api('/admin/probe', { method: 'POST', body: JSON.stringify({ ids, concurrency: 2, skip_cached_days: 0 }) })
+    .then((j) => {
+      const ok = j.results.filter((r) => !r.error).length;
+      const vis = j.results.filter((r) => r.vision === true).length;
+      const rea = j.results.filter((r) => r.reasoning === true).length;
+      toast(`探测完成 ${ok}/${ids.length}：视觉支持 ${vis} 个，思考支持 ${rea} 个`);
+      loadModels();
+    })
+    .catch((e) => toast(e.message, false));
+}
+let ovKey = '';
+function editOverride(id) {
+  const m = models.find((x) => x.id === id);
+  if (!m) return;
+  ovKey = m.id;
+  $('#ovTitle').textContent = `能力覆盖：${m.id}`;
+  $('#ovVision').value = m.sources.vision === 'override' ? String(m.caps.vision) : '';
+  $('#ovReasoning').value = m.sources.reasoning === 'override' ? String(m.caps.reasoning) : '';
+  $('#ovCtx').value = m.sources.context === 'override' ? m.caps.context : '';
+  $('#ovOut').value = m.sources.max_output === 'override' ? m.caps.max_output : '';
+  $('#dlgOverride').showModal();
+}
+async function saveOverride() {
+  const caps = {};
+  if ($('#ovVision').value !== '') caps.vision = $('#ovVision').value === 'true';
+  if ($('#ovReasoning').value !== '') caps.reasoning = $('#ovReasoning').value === 'true';
+  if ($('#ovCtx').value) caps.context = +$('#ovCtx').value;
+  if ($('#ovOut').value) caps.max_output = +$('#ovOut').value;
+  try {
+    await api('/admin/override', { method: 'PUT', body: JSON.stringify({ key: ovKey, caps }) });
+    $('#dlgOverride').close(); toast('已保存覆盖'); loadModels();
+  } catch (e) { toast(e.message, false); }
+}
+async function clearOverride() {
+  try {
+    await api(`/admin/override/${encodeURIComponent(ovKey)}`, { method: 'DELETE' });
+    $('#dlgOverride').close(); toast('已删除覆盖'); loadModels();
+  } catch (e) { toast(e.message, false); }
+}
+
+// ---------- 调试 ----------
+async function fillPlaygroundModels() {
+  if (!models.length) await loadModels();
+  const sel = $('#pgModel');
+  const cur = sel.value;
+  const names = [...new Set(models.map((m) => m.id))].sort();
+  sel.innerHTML = names.map((n) => `<option>${esc(n)}</option>`).join('');
+  if (cur && names.includes(cur)) sel.value = cur;
+  updatePgCaps();
+}
+function updatePgCaps() {
+  const m = models.find((x) => x.id === $('#pgModel').value);
+  if (!m) { $('#pgCaps').textContent = ''; return; }
+  $('#pgCaps').innerHTML = `${I.eye} 视觉 ${m.caps.vision ? '✓' : '✗'} · ${I.zap} 思考 ${m.caps.reasoning ? '✓' : '✗'} · 上下文 <b>${fmtTokens(m.caps.context)}</b> · 最大输出 <b>${fmtTokens(m.caps.max_output)}</b>`;
+}
+$('#pgModel').addEventListener('change', updatePgCaps);
+let pgAbort = null; // 进行中的调试请求
+function sendClick() {
+  if (pgAbort) { pgAbort.abort(); return; } // 进行中 → 停止
+  sendTest();
+}
+async function sendTest() {
+  const model = $('#pgModel').value;
+  if (!model) return toast('没有可选模型', false);
+  const messages = [];
+  if ($('#pgSystem').value.trim()) messages.push({ role: 'system', content: $('#pgSystem').value.trim() });
+  const content = $('#pgImage').value.trim()
+    ? [{ type: 'text', text: $('#pgUser').value }, { type: 'image_url', image_url: { url: $('#pgImage').value.trim() } }]
+    : $('#pgUser').value;
+  messages.push({ role: 'user', content });
+  const body = {
+    model, messages,
+    max_tokens: +$('#pgMax').value || undefined,
+    temperature: +$('#pgTemp').value,
+    stream: $('#pgStream').checked
+  };
+  if ($('#pgEffort').value) body.reasoning_effort = $('#pgEffort').value;
+
+  const out = $('#pgOut');
+  const meta = $('#pgMeta');
+  out.textContent = '';
+  const btn = $('#btnSend');
+  btn.textContent = '⏹ 停止';
+  pgAbort = new AbortController();
+  const t0 = performance.now();
+  let gotFirst = false;
+  const waitTimer = setInterval(() => {
+    if (!gotFirst) {
+      const s = ((performance.now() - t0) / 1000).toFixed(1);
+      meta.textContent = `请求中… ${s}s（等待上游响应，可点「⏹ 停止」取消）`;
+      out.textContent = '▍';
+    }
+  }, 200);
+  try {
+    const res = await fetch('/v1/chat/completions', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${getKey()}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: pgAbort.signal
+    });
+    const channel = res.headers.get('x-gateway-channel') || '?';
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      meta.textContent = `❌ HTTP ${res.status}${j?.error?.message ? ' · ' + j.error.message : ''}`;
+      out.textContent = j?.error?.message || '请求失败';
+      return;
+    }
+    gotFirst = true;
+    if (!body.stream) {
+      const j = await res.json();
+      const m = j.choices?.[0]?.message || {};
+      out.innerHTML =
+        (m.reasoning_content ? `<span class="reason">[思考] ${esc(m.reasoning_content)}\n\n</span>` : '') +
+        esc(m.content || '') + (m.tool_calls ? '\n[tool_calls] ' + esc(JSON.stringify(m.tool_calls, null, 2)) : '');
+      meta.textContent = `✓ 渠道: ${channel} · ${Math.round(performance.now() - t0)}ms · tokens ${j.usage?.prompt_tokens ?? '?'}/${j.usage?.completion_tokens ?? '?'} · finish: ${j.choices?.[0]?.finish_reason}`;
+    } else {
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '', content = '', reasoning = '', usage = null, finish = null, toolCalls = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') continue;
+          let j; try { j = JSON.parse(data); } catch { continue; }
+          if (j.error) { out.textContent += `\n[流错误] ${j.error.message}`; continue; }
+          const d = j.choices?.[0]?.delta || {};
+          if (d.reasoning_content) { reasoning += d.reasoning_content; }
+          if (d.content) content += d.content;
+          if (d.tool_calls) toolCalls.push(...d.tool_calls);
+          if (j.choices?.[0]?.finish_reason) finish = j.choices[0].finish_reason;
+          if (j.usage) usage = j.usage;
+          out.innerHTML =
+            (reasoning ? `<span class="reason">[思考中] ${esc(reasoning)}\n\n</span>` : '') +
+            esc(content) +
+            (toolCalls.length ? '\n[tool_calls] ' + esc(JSON.stringify(toolCalls, null, 2)) : '');
+        }
+      }
+      meta.textContent = `✓(流式) 渠道: ${channel} · ${Math.round(performance.now() - t0)}ms · tokens ${usage?.prompt_tokens ?? '?'}/${usage?.completion_tokens ?? '?'} · finish: ${finish}`;
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') { meta.textContent = `⏹ 已取消（${((performance.now() - t0) / 1000).toFixed(1)}s）`; }
+    else { meta.textContent = `❌ ${e.message}`; out.textContent = String(e); }
+  } finally {
+    clearInterval(waitTimer);
+    btn.disabled = false; btn.textContent = '发送请求';
+    pgAbort = null;
+  }
+}
+
+// ---------- 日志 ----------
+async function loadLogs() {
+  try {
+    const j = await api('/admin/logs?limit=200');
+    $('#logTable tbody').innerHTML = j.logs.map((l) => `<tr>
+      <td class="muted" style="white-space:nowrap">${new Date(l.t).toLocaleTimeString()}</td>
+      <td class="model-id">${esc(l.model)}</td>
+      <td>${esc(l.channel || '—')}${l.attempt > 1 ? ` <span class="chip">第${l.attempt}次</span>` : ''}${l.endpoint === '/v1/responses' ? ' <span class="chip">responses</span>' : ''}</td>
+      <td>${l.status < 400 ? '<span class="badge yes">' + l.status + '</span>' : '<span class="badge no" style="color:var(--red)">' + l.status + '</span>'}</td>
+      <td>${l.ms}ms</td>
+      <td style="white-space:nowrap">${fmtTokCell(l)}</td>
+      <td class="muted" style="max-width:340px;overflow:hidden;text-overflow:ellipsis">${esc(l.error || (l.failover ? '已故障转移' : ''))}</td>
+    </tr>`).join('') || '<tr><td colspan="7" class="empty-cell">暂无请求日志</td></tr>';
+  } catch (e) { toast(e.message, false); }
+}
+
+// ---------- 看板 ----------
+function fmtTokCell(l) {
+  if (l.prompt_tokens == null && l.completion_tokens == null) return '—';
+  const inn = (l.prompt_tokens ?? '—') + (l.cached_tokens ? ` · 缓存${l.cached_tokens}` : '');
+  const out = (l.completion_tokens ?? '—') + (l.reasoning_tokens ? ` · 思考${l.reasoning_tokens}` : '');
+  return `入 ${inn} / 出 ${out}`;
+}
+function dayKeyOf(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+async function loadUsage() {
+  const range = $('#udRange').value;
+  const today = dayKeyOf(new Date());
+  let from = null, to = null;
+  if (range === 'today') { from = to = today; }
+  else if (range !== 'all') {
+    const d = new Date(); d.setDate(d.getDate() - (+range - 1));
+    from = dayKeyOf(d); to = today;
+  }
+  const qs = new URLSearchParams();
+  if (from) qs.set('from', from);
+  if (to) qs.set('to', to);
+  if ($('#udChannel').value) qs.set('channel', $('#udChannel').value);
+  if ($('#udModel').value) qs.set('model', $('#udModel').value);
+  let j;
+  try { j = await api('/admin/usage?' + qs.toString()); } catch (e) { toast(e.message, false); return; }
+  const t = j.totals;
+  const hit = t.prompt ? Math.round((t.cached / t.prompt) * 100) : 0;
+  $('#udCards').innerHTML = `
+    <span>请求 <b>${t.requests}</b>（失败 <b>${t.fail}</b>）</span>
+    <span>输入 <b>${t.prompt.toLocaleString()}</b> tokens</span>
+    <span>输出 <b>${t.completion.toLocaleString()}</b> tokens（含思考 <b>${t.reasoning.toLocaleString()}</b>）</span>
+    <span>缓存命中 <b>${t.cached.toLocaleString()}</b>（命中率 <b>${hit}%</b>）</span>`;
+  // 每日柱图：按所选范围补齐空白天（无消耗的日子显示矮平柱）
+  let days = j.byDay.slice(-60);
+  if (range === 'today') {
+    const map = Object.fromEntries(days.map((d) => [d.day, d]));
+    const key = dayKeyOf(new Date());
+    days = [map[key] || { day: key, requests: 0, ok: 0, fail: 0, prompt: 0, completion: 0, reasoning: 0, cached: 0 }];
+  } else if (range !== 'all') {
+    const n = +range;
+    const map = Object.fromEntries(days.map((d) => [d.day, d]));
+    days = Array.from({ length: n }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (n - 1 - i));
+      const key = dayKeyOf(d);
+      return map[key] || { day: key, requests: 0, ok: 0, fail: 0, prompt: 0, completion: 0, reasoning: 0, cached: 0 };
+    });
+  }
+  const daysCard = $('#udDaysCard');
+  daysCard.style.display = 'block';
+  const max = Math.max(...days.map((d) => d.prompt + d.completion), 1);
+  $('#udBars').innerHTML = days.map((d) => {
+    const total = d.prompt + d.completion;
+    const h = total ? Math.max(6, Math.round((total / max) * 118)) : 3;
+    return `<div style="flex:0 1 46px;min-width:8px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%" title="${d.day}：入 ${d.prompt.toLocaleString()} / 出 ${d.completion.toLocaleString()} / 请求 ${d.requests} 次">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:3px;white-space:nowrap">${total ? fmtTokens(total) : ''}</div>
+      <div style="width:100%;height:${h}px;border-radius:4px 4px 0 0;${total ? 'background:linear-gradient(180deg,var(--accent),var(--accent2))' : 'background:var(--border);opacity:.5'}"></div>
+    </div>`;
+  }).join('');
+  $('#udDaysLabels').innerHTML = days.map((d, i) => `<div style="flex:0 1 46px;min-width:8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${days.length <= 16 || i % Math.ceil(days.length / 10) === 0 ? d.day.slice(5) : ''}</div>`).join('');
+  // 表格
+  const row = (name, a) => `<tr>
+    <td class="model-id">${esc(name)}</td>
+    <td>${a.requests}</td>
+    <td><span class="badge yes">${a.ok}</span> ${a.fail ? `<span class="badge no" style="color:var(--red)">${a.fail}</span>` : '—'}</td>
+    <td>${a.prompt.toLocaleString()}${a.cached ? ` <span class="chip">缓存 ${a.cached.toLocaleString()}</span>` : ''}</td>
+    <td>${a.completion.toLocaleString()}${a.reasoning ? ` <span class="chip">思考 ${a.reasoning.toLocaleString()}</span>` : ''}</td>
+    <td>${a.prompt ? Math.round((a.cached / a.prompt) * 100) + '%' : '—'}</td>
+  </tr>`;
+  $('#udChannelTable tbody').innerHTML = j.byChannel.map((r) => row(r.name, r)).join('') || '<tr><td colspan="6" class="empty-cell">暂无渠道消耗数据</td></tr>';
+  $('#udModelTable tbody').innerHTML = j.byModel.map((r) => row(r.name, r)).join('') || '<tr><td colspan="6" class="empty-cell">暂无模型消耗数据</td></tr>';
+}
+async function loadUsageFilters() {
+  // 用渠道/模型全集填充下拉（保持当前选择）
+  const cs = [...new Set(channels.map((c) => c.name))];
+  const ms = [...new Set(models.map((m) => m.id))].sort();
+  const fill = (sel, names, cur) => {
+    sel.innerHTML = `<option value="">${sel.id === 'udChannel' ? '全部渠道' : '全部模型'}</option>` + names.map((n) => `<option${n === cur ? ' selected' : ''}>${esc(n)}</option>`).join('');
+  };
+  fill($('#udChannel'), cs, $('#udChannel').value);
+  fill($('#udModel'), ms, $('#udModel').value);
+}
+
+// ---------- 设置 ----------
+async function tryAuth(key) {
+  try {
+    const r = await fetch('/admin/config', { headers: { authorization: `Bearer ${key}` } });
+    return r.ok;
+  } catch { return false; }
+}
+async function loadSettings() {
+  try {
+    const j = await api('/admin/config');
+    $('#setKey').value = j.gateway_key;
+    $('#setPort').value = j.port;
+    $('#setFailover').checked = j.routing.failover;
+    $('#setTimeout').value = j.routing.timeout_ms;
+    $('#setIdle').value = j.routing.idle_timeout_ms;
+    $('#setFirstByte').value = j.routing.first_byte_timeout_ms;
+    $('#setRefresh').value = j.capabilities.refresh_minutes;
+    $('#setCfgPath').textContent = j.config_path;
+    $('#settingsLocked').style.display = 'none';
+    loadKeys();
+  } catch (e) {
+    $('#settingsLocked').style.display = 'block';
+    toast(e.message, false);
+  }
+}
+function toggleKeyEye() {
+  const el = $('#setKey');
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  $('#btnEye').classList.toggle('show-pw', show);
+}
+function genKeyLocal() {
+  const b = new Uint8Array(24);
+  crypto.getRandomValues(b);
+  const s = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  $('#setKey').type = 'text'; $('#btnEye').classList.add('show-pw');
+  $('#setKey').value = 'sk-gw-' + s;
+  toast('已生成随机 key，点「保存 Key」生效');
+}
+async function saveGatewayKey() {
+  const k = $('#setKey').value.trim();
+  if (k.length < 8) return toast('网关 key 至少 8 个字符', false);
+  // 场景1：填的就是服务端当前 key（例如从启动日志复制来的）→ 直接用它登录
+  if (k !== getKey() && await tryAuth(k)) {
+    localStorage.setItem('gwkey', k);
+    $('#gwKey').value = k;
+    $('#healthInfo').textContent = '';
+    toast('✓ 该 key 与服务端一致，已登录');
+    loadAll(); loadSettings();
+    return;
+  }
+  // 场景2：浏览器持有有效 key → 正常修改 key
+  if (!(await tryAuth(getKey()))) {
+    return toast('浏览器当前没有有效 key，网页里无法直接设置新 key。可运行 npm run show-key 查看当前 key，或 npm run reset-key 重置', false);
+  }
+  try {
+    await api('/admin/config', { method: 'PUT', body: JSON.stringify({ gateway_key: k }) });
+    localStorage.setItem('gwkey', k);
+    $('#gwKey').value = k;
+    toast('✓ 网关 key 已更新，本页登录已同步；请同步更换所有客户端的 key');
+  } catch (e) { toast(e.message, false); }
+}
+async function rotateKey() {
+  if (!confirm('将立即生成并启用一个新 key，旧 key 立即失效，继续？')) return;
+  try {
+    const j = await api('/admin/rotate-key', { method: 'POST' });
+    localStorage.setItem('gwkey', j.gateway_key);
+    $('#gwKey').value = j.gateway_key;
+    $('#setKey').type = 'text'; $('#btnEye').classList.add('show-pw');
+    $('#setKey').value = j.gateway_key;
+    toast('✓ 已轮换新 key，本页登录已同步；旧 key 已失效');
+  } catch (e) { toast(e.message, false); }
+}
+async function saveRouting() {
+  try {
+    // 空字段 = 保持服务端当前值不改动（避免空串被当成 0）
+    const num = (id) => { const v = $(id).value.trim(); return v === '' ? null : +v; };
+    const routing = { failover: $('#setFailover').checked };
+    const capabilities = {};
+    const port = num('#setPort');
+    if (port !== null) {
+      if (!Number.isInteger(port) || port < 1 || port > 65535) return toast('端口必须是 1-65535 的整数', false);
+      body.port = port;
+    }
+    const t = num('#setTimeout'); if (t !== null) routing.timeout_ms = t;
+    const idle = num('#setIdle'); if (idle !== null) routing.idle_timeout_ms = idle;
+    const fb = num('#setFirstByte'); if (fb !== null) routing.first_byte_timeout_ms = fb;
+    const rf = num('#setRefresh'); if (rf !== null) capabilities.refresh_minutes = rf;
+    const body = { routing, capabilities };
+    const j = await api('/admin/config', { method: 'PUT', body: JSON.stringify(body) });
+    toast('✓ 设置已保存' + (body.port && j.config.port === body.port ? '（端口修改需重启生效）' : ''));
+    loadSettings();
+  } catch (e) { toast(e.message, false); }
+}
+
+// ---------- 附加 Keys ----------
+let keysList = [];
+async function loadKeys() {
+  try {
+    const j = await api('/admin/keys');
+    keysList = j.keys;
+    renderKeys();
+  } catch { /* 未登录时静默 */ }
+}
+function renderKeys() {
+  const tb = $('#keysTable tbody');
+  tb.innerHTML = keysList.map((k, i) => `
+    <tr>
+      <td><input value="${esc(k.name)}" onchange="renameKey('${esc(k.key)}', this.value)" style="width:150px"></td>
+      <td style="font-family:var(--mono);font-size:11.5px;word-break:break-all">${esc(k.key)}
+        <button class="mini ghost" style="margin-left:6px" onclick="copyText('${esc(k.key)}')">复制</button>
+      </td>
+      <td>
+        <label class="switch" title="点击启用 / 停用">
+          <input type="checkbox" ${k.enabled ? 'checked' : ''} onchange="toggleKey('${esc(k.key)}', this.checked)">
+          <span class="slider"></span>
+        </label>
+        <span class="muted" style="font-size:12px;margin-left:6px">${k.enabled ? '生效' : '已失效'}</span>
+      </td>
+      <td><button class="mini danger" onclick="deleteKey('${esc(k.key)}')">删除</button></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="empty-cell">还没有附加 Key，点上方「添加 Key」分发独立凭证</td></tr>';
+}
+async function addKey() {
+  const name = prompt('备注名称（如：朋友A / Cline），可留空', '');
+  if (name === null) return;
+  try {
+    const j = await api('/admin/keys', { method: 'POST', body: JSON.stringify({ name }) });
+    toast(`✓ 已添加 ${j.entry.key}（可在下方随时停用）`);
+    loadKeys();
+  } catch (e) { toast(e.message, false); }
+}
+async function renameKey(key, name) {
+  try { await api('/admin/keys', { method: 'PUT', body: JSON.stringify({ key, name }) }); toast('✓ 已更新备注'); }
+  catch (e) { toast(e.message, false); loadKeys(); }
+}
+async function toggleKey(key, enabled) {
+  try {
+    await api('/admin/keys', { method: 'PUT', body: JSON.stringify({ key, enabled }) });
+    toast(`✓ 已${enabled ? '启用' : '停用'}该 key（立即生效）`);
+    loadKeys();
+  } catch (e) { toast(e.message, false); loadKeys(); }
+}
+async function deleteKey(key) {
+  if (!confirm('删除后该 key 立即失效，使用它的客户端需要换新 key，继续？')) return;
+  try {
+    await api(`/admin/keys`, { method: 'DELETE', body: JSON.stringify({ key }) });
+    toast('✓ 已删除');
+    loadKeys();
+  } catch (e) { toast(e.message, false); }
+}
+
+// ---------- 用法 ----------
+function renderUsage() {
+  const base = `${location.origin}/v1`;
+  const key = getKey() || '<网关key>';
+  $('#uBase').textContent = base;
+  $('#snipCurl').textContent = `curl ${base}/chat/completions \\
+  -H "Authorization: Bearer ${key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "zhipu/glm-4.6",
+    "messages": [{"role": "user", "content": "你好"}],
+    "stream": true
+  }'`;
+  $('#snipPy').textContent = `from openai import OpenAI
+
+client = OpenAI(
+    base_url="${base}",
+    api_key="${key}",
+)
+
+resp = client.chat.completions.create(
+    model="gemini/gemini-2.5-flash",   # 或直接写模型名
+    messages=[{"role": "user", "content": "你好"}],
+    # reasoning_effort="high",          # 需要思考能力的模型可指定
+)
+print(resp.choices[0].message.content)`;
+  $('#snipJs').textContent = `import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "${base}",
+  apiKey: "${key}",
+});
+
+const stream = await client.chat.completions.create({
+  model: "anthropic/claude-sonnet-4-5",
+  messages: [{ role: "user", content: "你好" }],
+  stream: true,
+});
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? "");
+}`;
+  $('#snipClient').textContent = `API Host : ${location.origin}
+API Key  : ${getKey() || '<网关key>'}
+模型列表 : 自动拉取 /v1/models（含能力标注）
+Model    : 任选，支持 渠道名/模型名
+
+# Responses API 方言客户端（如 Codex CLI）
+# base_url 指到 ${base} 即可，/v1/responses 原生支持`;
+  document.querySelectorAll('pre.snippet').forEach((pre) => {
+    if (pre._bound) return;
+    pre._bound = 1;
+    const b = document.createElement('button');
+    b.className = 'copy ghost mini';
+    b.textContent = '复制';
+    b.onclick = () => copyText(pre.textContent.replace(/复制$/, ''), '已复制');
+    pre.appendChild(b);
+  });
+}
+
+// ---------- 首次设置向导（免验证，仅本机首次） ----------
+const BOOT_HDR = { 'x-gateway-bootstrap': '1', 'content-type': 'application/json' };
+async function checkFirstSetup() {
+  try {
+    const r = await fetch('/admin/bootstrap-status', { headers: BOOT_HDR });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.first_setup) return;
+    // 浏览器已有有效 key 就不打扰
+    if (getKey() && await tryAuth(getKey())) return;
+    $('#dlgSetup').showModal();
+  } catch { /* 服务不可达时静默 */ }
+}
+async function doSetup(useCustom) {
+  const body = {};
+  if (useCustom) {
+    const k = $('#suKey').value.trim();
+    if (k.length < 8) return toast('自定义 key 至少 8 个字符，或点左侧用自动生成的', false);
+    body.gateway_key = k;
+  }
+  try {
+    const r = await fetch('/admin/bootstrap', { method: 'POST', headers: BOOT_HDR, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return toast(j?.error?.message || '设置失败', false);
+    localStorage.setItem('gwkey', j.gateway_key);
+    $('#gwKey').value = j.gateway_key;
+    $('#dlgSetup').close();
+    toast('✓ 首次设置完成，欢迎！');
+    loadAll();
+  } catch (e) { toast(e.message, false); }
+}
+
+// ---------- 启动 ----------
+async function loadAll() {
+  $('#gwKey').value = localStorage.getItem('gwkey') || '';
+  renderChannels(); renderModels(); // 先渲染空态，接口失败时也有引导
+  try {
+    await Promise.all([loadChannels(), loadModels(), health()]);
+  } catch (e) {
+    $('#healthInfo').textContent = '未就绪';
+  }
+  if (!getKey()) {
+    $('#gwKey').focus();
+    $('#gwKey').placeholder = '先填写网关 key 登录';
+  }
+  checkFirstSetup();
+  setTimeout(loadUsageFilters, 100);
+}
+loadAll();
+</script>
+</body>
+</html>
